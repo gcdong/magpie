@@ -1520,6 +1520,9 @@ func providerRoutes(mux *http.ServeMux, w Windows) {
 			// Efforts, for efforts: the reasoning levels it offers, none
 			// for all it has
 			Efforts []string `json:"efforts"`
+			// Reasonless, for reasonless: whether the model takes no
+			// reasoning ask at all (provider.SetModelReasonless)
+			Reasonless *bool `json:"reasonless"`
 			// Images, for images: whether the model takes images. Nil
 			// gives the vendor's answer back.
 			Images *bool `json:"images"`
@@ -2187,6 +2190,17 @@ func providerRoutes(mux *http.ServeMux, w Windows) {
 			}
 		case "efforts":
 			if err := provider.SetModelEfforts(in.ID+"/"+req.Model, req.Efforts); err != nil {
+				fail(rw, err)
+				return
+			}
+		case "reasonless":
+			// no reasoning field at all, for a vendor that turns one away
+			// though its list says the model reasons (SetModelReasonless)
+			if req.Reasonless == nil {
+				fail(rw, errors.New("reasonless says whether the model takes no reasoning ask"))
+				return
+			}
+			if err := provider.SetModelReasonless(in.ID+"/"+req.Model, *req.Reasonless); err != nil {
 				fail(rw, err)
 				return
 			}

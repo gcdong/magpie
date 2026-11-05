@@ -7077,6 +7077,8 @@ function highlight(code, lang) {
 // full in their tooltip; a group's are what its members all have, and the
 // tooltip names its models.
 const IMAGE_GLYPH = "M2.5 3.5h11v9h-11zM2.5 10.5l3.25-3.25 3 3 2-2 2.75 2.75M10.25 6.75a.75.75 0 1 0 0-.01";
+// the same picture, struck through, for the chip of a model that takes none
+const IMAGE_OFF_GLYPH = "M2.5 3.5h11v9h-11zM2.5 10.5l3.25-3.25 3 3 2-2 2.75 2.75M3.5 2.5l9 11";
 function effortSpan(levels) {
   const say = levels.map((l) => t(l));
   return say.length > 2 ? `${say[0]}–${say[say.length - 1]}` : say.join(" / ");
@@ -7085,24 +7087,43 @@ function modelInfo(m) {
   const box = el("span", "minfo");
   const lines = [];
   const levels = m.efforts || [];
+  // onEfforts and onImages, from a routing group's editor, make each chip a
+  // model's setting there (provider.SetModelEfforts, SetModelReasonless and
+  // SetModelImage): its levels and its images are its provider's own.
   // a decision model answers a routing group's questions, it doesn't reason
   if (decideEntry(m)) lines.push(t("Decision model: routing groups ask it, agents never see it"));
   else if (levels.length) {
-    box.append(el("span", "badge mi-effort", effortSpan(levels)));
+    const c = el("span", "badge mi-effort", effortSpan(levels));
+    if (m.onEfforts) { c.classList.add("edits"); c.setAttribute("role", "button"); c.tabIndex = 0; c.onclick = m.onEfforts; }
+    box.append(c);
     // a group's levels are not its own: they are the ones every model in it
     // has, as its images are whichever member's and its window the largest's
     lines.push(m.group
       ? t("Reasoning: {levels} (the levels every model in it has)", { levels: levels.map((l) => t(l)).join(", ") })
       : t("Reasoning: {levels}", { levels: levels.map((l) => t(l)).join(", ") }));
-  } else lines.push(t("Reasoning levels: none known"));
+  } else lines.push(m.reasonless ? t("No reasoning field sent") : t("Reasoning levels: none known"));
   // nothing read of its images either way: magpie counts it text-only for a
   // describer (gateway.blindTo), which is not the same as its list saying so,
   // so it is not called text-only here either. Only a model that carries the
   // flag is unknown; one magpie has an answer for carries no such key at all.
   const imgUnknown = m.imagesUnknown === true;
-  if (m.images) {
-    const c = el("span", "badge mi-img");
-    c.append(svg(IMAGE_GLYPH, 11, 1.4));
+  // a clickable chip is drawn in every answer, so the answer is taken back
+  // where it was given: the picture, the same struck through for a model that
+  // takes none, and dimmed for one nothing was read of — never struck through
+  // for that one, since gateway.blindTo counts it text-only without its list
+  // saying so. A chip that only says what agents are told keeps the picture
+  // alone, as it always did.
+  if (m.images || m.onImages) {
+    const off = !m.images && !imgUnknown;
+    const c = el("span", "badge mi-img" + (off ? " off" : "") + (!m.images && imgUnknown ? " unknown" : ""));
+    c.append(svg(off ? IMAGE_OFF_GLYPH : IMAGE_GLYPH, 11, 1.4));
+    if (m.onImages) {
+      c.classList.add("edits");
+      c.setAttribute("role", "button");
+      c.tabIndex = 0;
+      c.onclick = m.onImages;
+      c.title = t(m.images ? "Accepts images: click to say it takes none" : "Text only: click to say it takes images");
+    }
     box.append(c);
   }
   lines.push(t(imgUnknown ? "Images: not known" : m.images ? (m.group ? "Accepts images (one of its models does)" : "Accepts images") : "Text only"));

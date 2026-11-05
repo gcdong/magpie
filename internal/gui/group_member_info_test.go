@@ -271,8 +271,14 @@ func TestGroupModelImagesOnTheWire(t *testing.T) {
 			t.Errorf("%s: imagesUnknown on the wire is %v, want %v (only true is sent)", tc.id, unk, tc.unknown)
 		}
 	}
-	// the same for a group's own members
+	// the same for a group's own members, and no `imageSet` among the keys
+	// they carry: that name is the Gateway page's (#885), where it means the
+	// user answered for the model themselves, and modelInfo is shared by
+	// both pages. A member's answer is Images, with ImagesUnknown unset.
 	for _, m := range doc.Groups[0].Info {
+		if _, ok := m["imageSet"]; ok {
+			t.Errorf("member %v carries imageSet, which a member's row must not (#885)", m["id"])
+		}
 		want := byID[m["id"].(string)]
 		img, unk := keys(m)
 		wantImg, wantUnk := keys(want)

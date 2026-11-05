@@ -2704,6 +2704,19 @@ body.window .ag-sk-icon { width: 22px; height: 22px; border-radius: 6px; }
    chips' 16px line as its height, so it stands as tall as they do (nb5p) */
 .row.model .minfo .mi-img, .rt-gedit .fbrow .minfo .mi-img { padding: 0 4px; height: 16px; box-sizing: border-box; }
 .row.model .minfo .mi-img svg, .rt-gedit .fbrow .minfo .mi-img svg { display: block; }
+/* a chip that is a click, in the Routing page's group editor: the model's
+   levels and whether it sees images are its provider's, and a click sets
+   them there (modelInfo's onEfforts and onImages). Hovered or focused, it
+   says so with the accent its switches use */
+.rt-gedit .fbrow .minfo .edits { cursor: pointer; transition: color .12s, box-shadow .12s; }
+.rt-gedit .fbrow .minfo .edits:hover, .rt-gedit .fbrow .minfo .edits:focus-visible { color: var(--fg); box-shadow: inset 0 0 0 1px var(--accent); }
+/* the chip of a model that takes no images, which is still a click: the
+   struck-through picture, dimmed so it reads as "not this one" rather than
+   as a picture that is there */
+.rt-gedit .fbrow .minfo .mi-img.off { opacity: .7; }
+/* a model nothing was read of: the picture dimmed, neither struck through
+   (it is not said to take none) nor as bright as one that does */
+.rt-gedit .fbrow .minfo .mi-img.unknown { opacity: .55; }
 .provider .pswitch { margin-left: 8px; }
 .editor .off-note { grid-column: 1 / -1; }
 .editor .self-note label.tick { margin-top: 6px; }

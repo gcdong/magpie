@@ -144,6 +144,18 @@ type memberJSON struct {
 	// (provider.FreeModel): its provider is the user's Free for me, or its
 	// vendor serves it free. The Routing page tags it (jiabubu on Discord)
 	Free bool `json:"free,omitempty"`
+	// Own: the reasoning levels its model has of its own, before the ones
+	// the user kept (Efforts are those it is offered). The editor's reasoning
+	// chip offers them, so a member's levels are the user's to change there
+	// (provider.SetModelEfforts); none when no list knows any
+	Own []string `json:"own,omitempty"`
+	// Reasonless: the user said it takes no reasoning ask
+	// (provider.SetModelReasonless), so its chip says so and none is sent
+	Reasonless bool `json:"reasonless,omitempty"`
+	// No `imageSet` here on purpose (#885): that name is the Gateway page's,
+	// where it means the user answered for the model themselves, and
+	// modelInfo is shared by both pages. A member's own answer shows as
+	// Images with ImagesUnknown unset, which is all the chip needs.
 }
 
 type modelRef struct {
@@ -410,6 +422,12 @@ func groupsState() groupsJSON {
 					if e.Group == "" && e.Provider.ID == p.ID && e.Model == model {
 						m.Context, m.Images, m.ImagesUnknown = e.Context, seesImages(e), imagesUnknown(e)
 						m.Efforts = e.Efforts
+						// what the editor's chips change, as the provider's own
+						// editor says it: the levels its model has, whether the
+						// user said it takes no reasoning ask, and whether the
+						// user answered for its images
+						m.Own = p.Known(model)
+						m.Reasonless = provider.Reasonless(p.ID, model)
 						break
 					}
 				}
