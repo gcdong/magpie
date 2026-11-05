@@ -5551,6 +5551,30 @@ function routingPage(part) {
   // what app.js asks before the reader leaves the page
   part.dirty = groupDirty;
   part.discard = () => { gEdit = null; renderGroups(); };
+  // what a model's chips changed is the provider's, not this group's: the
+  // groups are read again (their levels, shared and memberInfo follow what
+  // magpie now serves), so the chips and the group's level hint say the new
+  // answer, and the window's provider list too, for the Gateway page's and
+  // the agents' pickers. The editor itself is drawn again by the caller, from
+  // the same draft, so nothing typed is lost
+  async function afterModelWrite() {
+    try { groups = groupsFrom(await api("groups")); } catch { return; }
+    if (pBox) renderPanel();
+    if (headOf) header(...headOf);
+    // the editor is drawn again from the same draft: a chip wrote the model,
+    // never the group, so nothing the reader typed is lost, and steady keeps
+    // the page where it was. The reader's hands go back to the chip they
+    // were on, by its place in the member's row
+    const had = document.activeElement?.closest?.(".rt-gedit") ? document.activeElement : null;
+    const row = had?.closest(".fbrow"), at = row ? [...gList.querySelectorAll(".rt-gedit .fbrow")].indexOf(row) : -1;
+    const chip = had ? [...had.classList].filter((c) => c !== "open").join(".") : "";
+    renderGroups();
+    if (had && at >= 0 && chip) {
+      const again = gList.querySelectorAll(".rt-gedit .fbrow")[at]?.querySelector(`.${chip.replace(/ /g, ".")}`);
+      again?.focus({ preventScroll: true });
+    }
+    load(); // the gateway's model list, the agents' pickers
+  }
   async function groupAction(action, body, ok) {
     if (action === "delete" && !await confirmRemoval(groups?.groups.find((g) => g.id === body.id)?.name || body.id,
       "This routing group will no longer be available to agents.")) return;
@@ -6618,7 +6642,12 @@ function routingPage(part) {
 
     // members, in order: the first is what an agent is told the model can do.
     // More are picked with the model picker the agents use.
-    const infoOf = (id) => g?.memberInfo?.find((x) => x.id === id);
+    // infoOf is a member's own row as /api/groups said it, read from the
+    // group's state now rather than from the g this editor was opened on:
+    // what a chip writes is the model's (its levels, whether it is sent any,
+    // whether it sees images), and the groups are read again after it, so the
+    // editor is drawn again from the same draft with the new answer
+    const infoOf = (id) => (gEdit ? groups?.groups?.find((x) => x.id === gEdit.id) || g : g)?.memberInfo?.find((x) => x.id === id);
     const pickFrom = (label, anchor, ev, options, onPick, value = "") => openPicker({ id: "", name: "", fields: [] }, { key: "rule", label, value, menu: true, options, onPick }, anchor, ev);
     // the agents magpie heard from in the last 30 days that it doesn't
     // know, by the names the gateway gave them (usage.AgentOf), asked for
@@ -6757,7 +6786,65 @@ function routingPage(part) {
         // A member whose list says nothing of images is marked unknown rather
         // than text-only: magpie counts it text-only for a describer
         // (gateway.blindTo), which is not the same as its list saying so.
-        if (chips) row.append(modelInfo({ ...chips, group: !!s, images: info?.images ?? chips.images, imagesUnknown: info?.imagesUnknown ?? chips.imagesUnknown }));
+        // On a model's own row its two chips are a click: the levels it
+        // reasons at and whether it sees images are its provider's, edited
+        // there for every group it is in (provider.SetModelEfforts,
+        // SetModelReasonless and SetModelImage), and the groups read again
+        // from what was saved. A group's chips, and a decision or image
+        // model's, only say what agents are told.
+        // its levels are those the member's row says it offers now, not
+        // groups.models', which the model's own chips may have changed since;
+        // a model sent no reasoning field offers none, whatever its list has
+        const own = info?.own || [];
+        // a model no list knows the levels of can be given any of them, as
+        // the provider's own editor offers them (modelJSON.given)
+        const ownLevels = own.length ? LEVELS.filter((v) => own.includes(v)) : LEVELS;
+        const levels = (info?.reasonless ? [] : info?.efforts ?? chips?.efforts ?? []).filter((v) => LEVELS.includes(v));
+        const mi = chips ? modelInfo({
+          ...chips, efforts: levels, reasonless: !!info?.reasonless, group: !!s, images: info?.images ?? chips.images, imagesUnknown: info?.imagesUnknown ?? chips.imagesUnknown,
+          onEfforts: !m || s || deciderOf(id) || drawerOf(id) ? undefined : (ev) => {
+            const offered = levels.filter((v) => LEVELS.includes(v));
+            const reasonless = !!info?.reasonless;
+            // the provider's own id of the model, never the member's
+            // "provider/model": the backend asks the provider for that one
+            // (provider.splitRef, Provider.serves). The member's own row says
+            // it (groupsState's memberInfo.model); failing that, the part
+            // after the first slash, past any effort the member is fixed at
+            const model = info?.model || splitMember(id)[0].slice(m.provider.length + 1);
+            pickFrom("reasoning", ev.currentTarget, ev, [
+              ...ownLevels.map((v) => ({ value: v, label: v, note: t("offered to agents"), ticked: !reasonless && offered.includes(v) })),
+              { value: "off", label: t("No reasoning field sent"), note: t("as a model that doesn't reason"), ticked: reasonless },
+              { value: "all", label: t("All its levels"), note: own.length ? ownLevels.join(" / ") : t("none known"), ticked: !reasonless && ownLevels.length > 0 && offered.length === ownLevels.length },
+            ], async (v) => {
+              try {
+                if (v === "off") await api("provider/reasonless", { id: m.provider, model, reasonless: true });
+                else if (v === "all") await api("provider/efforts", { id: m.provider, model, efforts: [] });
+                else {
+                  // a level ticked of a model sent no field offers it alone,
+                  // as a tick in the provider's own editor does
+                  const next = reasonless ? [v] : offered.includes(v) ? offered.filter((x) => x !== v) : LEVELS.filter((x) => x === v || offered.includes(x));
+                  // the last one taken off is no reasoning field at all, not
+                  // an empty list: SetModelEfforts reads none as every level
+                  // it has (provider.keptEfforts)
+                  if (!next.length) await api("provider/reasonless", { id: m.provider, model, reasonless: true });
+                  else await api("provider/efforts", { id: m.provider, model, efforts: next });
+                }
+                status(t("{name} saved", { name: memberName(id) }), "ok");
+              } catch (e) { status(e.message, "err"); return; }
+              await afterModelWrite();
+            // no "current value" row: each level's tick already says which
+            // ones are offered, and a joined "low+high+max" is no option's
+            // value (openPicker would add it as the current one)
+            }, "");
+          },
+          onImages: !m || s ? undefined : async () => {
+            const sees = info?.images ?? chips.images;
+            const model = info?.model || splitMember(id)[0].slice(m.provider.length + 1);
+            try { await api("provider/images", { id: m.provider, model, images: !sees }); status(t("{name} saved", { name: memberName(id) }), "ok"); } catch (e) { status(e.message, "err"); return; }
+            await afterModelWrite();
+          },
+        }) : null;
+        if (mi) row.append(mi);
         // the reasoning the model is sent at in this group: the group's
         // (blank), or one of its own whatever the agent asks. A group in
         // it reasons as it says.

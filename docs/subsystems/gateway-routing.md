@@ -505,6 +505,29 @@ used only on the accounts it names, one it doesn't name on every account.
 `TestGroupAccountsHoldEveryRoute`, `TestGroupAccountsFallBackWithinTheGroup`,
 `TestGroupAccountsAndAKeysAccounts`, `TestGroupAccountsSaved`,
 `TestHeldToGroup`, `group-accounts.test.cjs`.
+- A member's reasoning levels and whether it sees images are its provider's,
+  not its group's: the same model in two groups takes the same levels and
+  sees the same images. The editor says them on the chips its row carries
+  (`modelInfo` in [`app.js`](../../internal/gui/assets/app.js)), and on a
+  model's own row each of those two chips is a click (`onEfforts`,
+  `onImages`): its levels offer the model's own with the ones agents are
+  given ticked (`provider.SetModelEfforts`), "No reasoning field sent"
+  (`SetModelReasonless`) and "All its levels"; the image chip asks the
+  other answer for it (`SetModelImage`), over what its vendor's list says,
+  and is drawn in every answer it can give — the picture, the same picture
+  struck through for a model that takes none, and the picture dimmed for
+  one nothing was read of — so the answer can be taken back where it was
+  given rather than leaving a row with no chip to click.
+  Both write through `POST /api/provider/{efforts,reasonless,images}`, the
+  calls the provider's own Names, prices & levels make, and the groups are
+  read again, so the chips and the group's level hint say the new answer
+  with the editor drawn again from the same draft. `/api/groups` says of
+  each member what the chips need: `own` (the levels its model has before
+  the user kept some), `reasonless`, and `imageSet` (the user answered for
+  its images themselves). A member that is a routing group, and a decision
+  or image model, carry chips that only say what agents are told.
+  `TestGroupMemberCarriesWhatItsProviderCanChange`,
+  `TestGroupMemberChipsWriteTheModel`, `group-member-chips.test.cjs`.
 
 ## Remote magpie APIs
 

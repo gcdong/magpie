@@ -114,6 +114,7 @@ const rows = (page) => page.locator(".rt-gedit .fbrow").evaluateAll((rs) => rs.m
     badges: info ? [...info.querySelectorAll(".badge")].map((b) => b.textContent.trim() || "img") : [],
     title: info ? info.title : "",
     img: !!(info && info.querySelector(".mi-img")),
+    imgOff: !!(info && info.querySelector(".mi-img.off")),
     follows: inner ? inner.textContent.trim() : "",
     followsTitle: inner ? inner.title : "",
   };
@@ -167,9 +168,18 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.equal(seen.length, 3, "every member has its row");
       assert.deepEqual(seen.map((r) => r.name), ["Eye", "Text", "Mystery"], "the rows are the members, in order");
 
-      // what it sees: the badge on the one that sees, and no badge on the others
+      // what it sees: the picture on the one that sees, and the struck-through
+      // one on a member that takes none — both are a click now (the chip is
+      // where the answer is given and taken back), so neither is missing
       assert(seen[0].img, "the member that sees images carries the image chip");
-      assert(!seen[1].img && !seen[2].img, "a member that does not see carries none");
+      assert(!seen[0].imgOff, "and its picture is not struck through");
+      assert(seen[1].img, "a member that takes none carries the chip too");
+      assert(seen[1].imgOff, "struck through, so the answer can be taken back");
+      // a member nothing was read of carries the chip too, dimmed and not
+      // struck through: no answer is there to take back, so it is not called
+      // text only, and a click gives one
+      assert(seen[2].img, "a member nothing was read of carries the chip");
+      assert(!seen[2].imgOff, "and it is not struck through as one that takes none");
 
       // and the same said in words, in the tooltip
       assert(seen[0].title.includes(w.images), `the seeing member says so: ${seen[0].title}`);
@@ -232,8 +242,9 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert(groupRow.title.includes(w.groupLevels), `the group's levels are said to be its models': ${groupRow.title}`);
       assert(groupRow.title.includes(w.groupContext), `the window is said to be the largest of its models': ${groupRow.title}`);
 
-      // a plain member beside it is unchanged
-      assert(!seen[0].img, "the plain text-only member carries no image chip");
+      // a plain member beside it says the same of itself, and its image chip
+      // is there struck through: the answer is given and taken back on it
+      assert(seen[0].img && seen[0].imgOff, "the plain text-only member carries the struck-through chip");
       assert(seen[0].title.includes(w.text), `the plain member still says text only: ${seen[0].title}`);
 
       // where a model's own reasoning picker sits, a group carries a chip
